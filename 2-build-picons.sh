@@ -1,104 +1,72 @@
 #!/bin/bash
 
-#sudo apt-get install p7zip-full imagemagick pngnq librsvg2-bin binutils
+#sudo apt-get install imagemagick pngnq librsvg2-bin binutils
 
-version="$(date +"%Y-%m-%d--%H-%M-%S")"
+version="$(date +'%Y-%m-%d--%H-%M-%S')"
+timestamp="$(echo ${version//-/} | rev | cut -c 3- | rev).$(echo ${version//-/} | cut -c 13-)"
 
-REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-SOURCEDIR="$REPODIR/build-source"
-TOOLSDIR="$REPODIR/build-tools"
-
-TEMP="/tmp/picons-tmp"
-TEMPBINARIES="/tmp/picons-binaries"
-TEMPPICONS="$TEMP/picons"
-TEMPSOURCEPICONS="$TEMP/sourcepicons"
-TEMPSOURCEPICONSBLACK="$TEMPSOURCEPICONS/black"
-TEMPSOURCEPICONSWHITE="$TEMPSOURCEPICONS/white"
-TEMPSYMLINKS_LOGOS="$TEMP/symlinks_logos"
-
-SERVICELIST="/tmp/servicelist_"
-
-LOGFILE="/tmp/picons.log"
-echo "$version" > "$LOGFILE"
-
-chmod -R 755 "$TOOLSDIR"/*.sh
-
-"$TOOLSDIR"/check-images.sh "$SOURCEDIR/tv"
-"$TOOLSDIR"/check-images.sh "$SOURCEDIR/radio"
-
-if [ -d "$TEMP" ]; then
-    rm -rf "$TEMP"
-fi
-mkdir "$TEMP"
-
-if ! [ -d "$TEMPBINARIES" ]; then
-    mkdir "$TEMPBINARIES"
+if [ -d "/dev/shm" ]; then
+    temp="/dev/shm/picons-tmp"
 else
-    rm -rf "$TEMPBINARIES"
-    mkdir "$TEMPBINARIES"
+    temp="/tmp/picons-tmp"
 fi
 
-echo "$(date +"%H:%M:%S") - Creating symlinks and copying logos"
-"$TOOLSDIR"/create-symlinks+copy-logos.sh "$SERVICELIST" "$TEMPSYMLINKS_LOGOS" "$SOURCEDIR"
+location="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+buildsource="$location/build-source"
+buildtools="$location/build-tools"
+binaries="$HOME/picons-binaries"
 
-echo "$(date +"%H:%M:%S") - Converting svg files"
-mkdir -p "$TEMPSOURCEPICONSBLACK/tv"
-mkdir -p "$TEMPSOURCEPICONSBLACK/radio"
-mkdir -p "$TEMPSOURCEPICONSWHITE/tv"
-mkdir -p "$TEMPSOURCEPICONSWHITE/radio"
+if [ -d "$temp" ]; then rm -rf "$temp"; fi
+mkdir "$temp"
 
-cp "$TEMPSYMLINKS_LOGOS/logos/tv/"*.* "$TEMPSOURCEPICONSBLACK/tv" 2>> "$LOGFILE"
-cp "$TEMPSYMLINKS_LOGOS/logos/radio/"*.* "$TEMPSOURCEPICONSBLACK/radio" 2>> "$LOGFILE"
+if [ -d "$binaries" ]; then rm -rf "$binaries"; fi
+mkdir "$binaries"
 
-for file in $(find "$TEMPSOURCEPICONS" -type f -name '*.svg'); do
+chmod -R 755 "$buildtools/"*.sh
+
+echo "$(date +'%H:%M:%S') - Version: $version"
+
+echo "$(date +'%H:%M:%S') - Checking logos"
+"$buildtools/check-logos.sh" "$buildsource/tv"
+"$buildtools/check-logos.sh" "$buildsource/radio"
+
+echo "$(date +'%H:%M:%S') - Creating symlinks and copying logos"
+"$buildtools/create-symlinks+copy-logos.sh" "$HOME/servicelist_" "$temp/newbuildsource" "$buildsource"
+
+echo "$(date +'%H:%M:%S') - Converting svg files"
+for file in $(find "$temp/newbuildsource/logos" -type f -name '*.svg'); do
     rsvg-convert -w 400 -h 400 -a -f png -o ${file%.*}.png "$file"
     rm "$file"
 done
 
-cp "$TEMPSOURCEPICONSBLACK/tv/"*.* "$TEMPSOURCEPICONSWHITE/tv" 2>> "$LOGFILE"
-cp "$TEMPSOURCEPICONSBLACK/radio/"*.* "$TEMPSOURCEPICONSWHITE/radio" 2>> "$LOGFILE"
-cp "$TEMPSYMLINKS_LOGOS/logos/tv/white/"*.* "$TEMPSOURCEPICONSWHITE/tv" 2>> "$LOGFILE"
-cp "$TEMPSYMLINKS_LOGOS/logos/radio/white/"*.* "$TEMPSOURCEPICONSWHITE/radio" 2>> "$LOGFILE"
+for background in "$buildsource/backgrounds/"*.build ; do
 
-for file in $(find "$TEMPSOURCEPICONS" -type f -name '*.svg'); do
-    rsvg-convert -w 400 -h 400 -a -f png -o ${file%.*}.png "$file"
-    rm "$file"
-done
+    backgroundname=$(basename ${background%.*})
 
-for background in "$SOURCEDIR/backgrounds/"*.build ; do
+    for backgroundcolor in "$buildsource/backgrounds/$backgroundname.build/"*.build ; do
 
-    backgroundname=${background%.*}
-    backgroundname=${backgroundname##*/}
+        backgroundcolorname=$(basename ${backgroundcolor%.*.*})
 
-    for backgroundcolor in "$SOURCEDIR/backgrounds/$backgroundname.build/"*.build ; do
+        echo "$(date +'%H:%M:%S') -----------------------------------------------------------"
+        echo "$(date +'%H:%M:%S') - Creating picons: $backgroundname.$backgroundcolorname"
 
-        backgroundcolorname=${backgroundcolor%.*}
-        backgroundcolorname=${backgroundcolorname%.*}
-        backgroundcolorname=${backgroundcolorname##*/}
+        mkdir -p "$temp/finalpicons/picon"
 
-        echo "$(date +"%H:%M:%S") -----------------------------------------------------------"
-        echo "$(date +"%H:%M:%S") - Creating picons: $backgroundname.$backgroundcolorname"
-
-        if [[ "$backgroundcolorname" == *-white* ]]; then
-            USETEMPSOURCEPICONS="$TEMPSOURCEPICONSWHITE"
-        else
-            USETEMPSOURCEPICONS="$TEMPSOURCEPICONSBLACK"
-        fi
-
-        mkdir -p "$TEMPPICONS/picon"
-
-        for directory in "$USETEMPSOURCEPICONS/"* ; do
+        for directory in "$temp/newbuildsource/logos/"* ; do
             if [ -d "$directory" ]; then
                 directory=${directory##*/}
-                for logo in "$USETEMPSOURCEPICONS/$directory/"*.png ; do
+                for logo in "$temp/newbuildsource/logos/$directory/"*.png ; do
                     if [ -f "$logo" ]; then
-                        logoname=${logo##*/}
-                        logoname=${logoname%.*}
-                        fullfilepath="$TEMPPICONS/picon/$directory/$logoname.png"
+                        logoname=$(basename ${logo%.*})
 
-                        if ! [ -d "$TEMPPICONS/picon/$directory" ]; then
-                            mkdir -p "$TEMPPICONS/picon/$directory"
+                        if ! [ -d "$temp/finalpicons/picon/$directory" ]; then
+                            mkdir -p "$temp/finalpicons/picon/$directory"
+                        fi
+
+                        if [[ "$backgroundcolorname" == *-white* ]]; then
+                            if [ -f "$temp/newbuildsource/logos/$directory/white/$logoname.png" ]; then
+                                logo="$temp/newbuildsource/logos/$directory/white/$logoname.png"
+                            fi
                         fi
 
                         case "$backgroundname" in
@@ -129,83 +97,53 @@ for background in "$SOURCEDIR/backgrounds/"*.build ; do
                                 ;;
                         esac
 
-                        convert "$backgroundcolor" \( "$logo" -background none -bordercolor none -border 100 -trim -resize $resize -gravity center -extent $extent +repage \) -layers merge - 2>> "$LOGFILE" | $compress > "$fullfilepath" 2>> "$LOGFILE"
+                        convert "$backgroundcolor" \( "$logo" -background none -bordercolor none -border 100 -trim -resize $resize -gravity center -extent $extent +repage \) -layers merge - 2>> /dev/null | $compress > "$temp/finalpicons/picon/$directory/$logoname.png"
+
                     fi
                 done
             fi
         done
 
+        echo "$(date +'%H:%M:%S') - Creating binary packages: $backgroundname.$backgroundcolorname"
+        cp --no-dereference "$temp/newbuildsource/symlinks/"* "$temp/finalpicons/picon"
+
+        packagename="$backgroundname.${backgroundcolorname}_${version}"
+
         if [ "$backgroundname" = "70x53" ] || [ "$backgroundname" = "100x60" ] || [ "$backgroundname" = "220x132" ] || [ "$backgroundname" = "400x240" ]; then
+            mkdir "$temp/finalpicons/CONTROL" ; cat > "$temp/finalpicons/CONTROL/control" <<-EOF
+				Package: enigma2-plugin-picons-$backgroundname.$backgroundcolorname
+				Version: $version
+				Section: base
+				Architecture: all
+				Maintainer: http://picons.github.io
+				Source: https://github.com/picons/picons-source
+				Description: $backgroundname Picons ($backgroundcolorname)
+				OE: enigma2-plugin-picons-$backgroundname.$backgroundcolorname
+				HomePage: http://picons.github.io
+				License: unknown
+				Priority: optional
+			EOF
+            find "$temp/finalpicons" -exec touch --no-dereference -t "$timestamp" {} \;
+            fakeroot -- "$buildtools/ipkg-build.sh" -o root -g root "$temp/finalpicons" "$binaries" > /dev/null
 
-            echo "$(date +"%H:%M:%S") - Copying symlinks: $backgroundname.$backgroundcolorname"
-            cp -P "$TEMPSYMLINKS_LOGOS/symlinks/1_"* "$TEMPPICONS/picon" 2>> "$LOGFILE"
-
-            echo "$(date +"%H:%M:%S") - Creating ipk: $backgroundname.$backgroundcolorname"
-            mkdir "$TEMPPICONS/CONTROL"
-            echo "Package: enigma2-plugin-picons-tv-$backgroundname.$backgroundcolorname" > "$TEMPPICONS/CONTROL/control"
-            echo "Version: $version" >> "$TEMPPICONS/CONTROL/control"
-            echo "Section: base" >> "$TEMPPICONS/CONTROL/control"
-            echo "Architecture: all" >> "$TEMPPICONS/CONTROL/control"
-            echo "Maintainer: http://picons.github.io" >> "$TEMPPICONS/CONTROL/control"
-            echo "Source: https://github.com/picons/picons-source" >> "$TEMPPICONS/CONTROL/control"
-            echo "Description: $backgroundname Picons ($backgroundcolorname)" >> "$TEMPPICONS/CONTROL/control"
-            echo "OE: enigma2-plugin-picons-tv-$backgroundname.$backgroundcolorname" >> "$TEMPPICONS/CONTROL/control"
-            echo "HomePage: http://picons.github.io" >> "$TEMPPICONS/CONTROL/control"
-            echo "License: unknown" >> "$TEMPPICONS/CONTROL/control"
-            echo "Priority: optional" >> "$TEMPPICONS/CONTROL/control"
-            chmod -R 777 "$TEMPPICONS"
-            "$TOOLSDIR"/ipkg-build.sh -o root -g root "$TEMPPICONS" "$TEMPBINARIES" >> "$LOGFILE"
-
-            #DISABLED
-            #echo "$(date +"%H:%M:%S") - Creating tar.bz2: $backgroundname.$backgroundcolorname"
-            #mkdir "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            #cp -P -r "$TEMPPICONS/picon/"* "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" 2>> "$LOGFILE"
-            #chmod -R 777 "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            #tar --owner=root --group=root -cjf "$TEMPBINARIES/$backgroundname.$backgroundcolorname"\_"$version.tar.bz2" -C "$TEMPPICONS" "$backgroundname.$backgroundcolorname"\_"$version"
-            #rm -rf "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-
-            echo "$(date +"%H:%M:%S") - Creating 7z: $backgroundname.$backgroundcolorname"
-            mkdir "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            cp -H "$TEMPPICONS/picon/1_"*.png "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" 2>> "$LOGFILE"
-            chmod -R 777 "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            7z a -t7z -mx9 "$TEMPBINARIES/$backgroundname.$backgroundcolorname"\_"$version.7z" "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" >> "$LOGFILE"
-
+            mv "$temp/finalpicons/picon" "$temp/finalpicons/$packagename"
+            fakeroot -- tar --dereference --owner=root --group=root -cf - --directory="$temp/finalpicons" "$packagename" --exclude="tv" --exclude="radio" | xz -9 --extreme --memlimit=40% > "$binaries/$packagename.tar.xz"
         fi
 
         if [ "$backgroundname" = "kodi" ]; then
-
-            echo "$(date +"%H:%M:%S") - Copying symlinks: $backgroundname.$backgroundcolorname"
-            cp -P "$TEMPSYMLINKS_LOGOS/symlinks/1_"* "$TEMPPICONS/picon" 2>> "$LOGFILE"
-
-            echo "$(date +"%H:%M:%S") - Creating tar.bz2: $backgroundname.$backgroundcolorname"
-            mkdir "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            cp -P -r "$TEMPPICONS/picon/"* "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" 2>> "$LOGFILE"
-            chmod -R 777 "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            tar --owner=root --group=root -cjf "$TEMPBINARIES/$backgroundname.$backgroundcolorname"\_"$version.tar.bz2" -C "$TEMPPICONS" "$backgroundname.$backgroundcolorname"\_"$version"
-            rm -rf "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-
-            #DISABLED
-            #echo "$(date +"%H:%M:%S") - Creating 7z: $backgroundname.$backgroundcolorname"
-            #mkdir "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            #cp -H "$TEMPPICONS/picon/1_"*.png "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" 2>> "$LOGFILE"
-            #chmod -R 777 "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version"
-            #7z a -t7z -mx9 "$TEMPBINARIES/$backgroundname.$backgroundcolorname"\_"$version.7z" "$TEMPPICONS/$backgroundname.$backgroundcolorname"\_"$version" >> "$LOGFILE"
-
+            find "$temp/finalpicons" -exec touch --no-dereference -t "$timestamp" {} \;
+            mv "$temp/finalpicons/picon" "$temp/finalpicons/$packagename"
+            fakeroot -- tar --owner=root --group=root -cf - --directory="$temp/finalpicons" "$packagename" | xz -9 --extreme --memlimit=40% > "$binaries/$packagename.tar.xz"
         fi
 
-        rm -rf "$TEMPPICONS"
+        find "$binaries" -exec touch -t "$timestamp" {} \;
+        rm -rf "$temp/finalpicons"
 
     done
 
 done
 
-touchstamp=`echo ${version//-/} | rev | cut -c 3- | rev`.`echo ${version//-/} | cut -c 13-`
-for file in "$TEMPBINARIES/"* ; do
-    touch -t "$touchstamp" "$file"
-done
+if [ -d "$temp" ]; then rm -rf "$temp"; fi
 
-if [ -d "$TEMP" ]; then
-    rm -rf "$TEMP"
-fi
-
+echo -e "\nThe binary packages are located in:\n$binaries\n"
 read -p "Press any key to exit..." -n1 -s

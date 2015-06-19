@@ -2,12 +2,18 @@
 
 location=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+if [ -d "/dev/shm" ]; then
+    temp="/dev/shm"
+else
+    temp="/tmp"
+fi
+
 #Enigma2
 if [ -d "$location/build-input/enigma2" ]; then
     echo "Enigma2: Converting channellist..."
 
-    file="/tmp/servicelist_enigma2"
-    tempfile="/tmp/$(echo $RANDOM)"
+    file="$HOME/servicelist_enigma2"
+    tempfile="$temp/$(echo $RANDOM)"
 
     cat "$location/build-input/enigma2/"*bouquet.* | grep -o '#SERVICE .*:0:.*:.*:.*:.*:.*:0:0:0' | sed -e 's/#SERVICE //g' -e 's/.*/\U&\E/' -e 's/:/_/g' | sort | uniq | while read serviceref ; do
         unique_id=$(echo "$serviceref" | sed -n -e 's/^[^_]*_0_[^_]*_//p' | sed -n -e 's/...._0_0_0$//p')
@@ -33,8 +39,8 @@ fi
 if [ -d "$location/build-input/tvheadend" ]; then
     echo "TvHeadend: Converting channellist..."
 
-    file="/tmp/servicelist_tvheadend"
-    tempfile="/tmp/$(echo $RANDOM)"
+    file="$HOME/servicelist_tvheadend"
+    tempfile="$temp/$(echo $RANDOM)"
 
     for channelfile in "$location/build-input/tvheadend/channel/config/"* ; do
         serviceref=$(cat $channelfile | grep -o '1_0_.*_.*_.*_.*_.*_0_0_0')
@@ -61,8 +67,8 @@ fi
 if [ -f "$location/build-input/channels.conf" ]; then
     echo "VDR: Converting channellist..."
 
-    file="/tmp/servicelist_vdr"
-    tempfile="/tmp/$(echo $RANDOM)"
+    file="$HOME/servicelist_vdr"
+    tempfile="$temp/$(echo $RANDOM)"
 
     cat "$location/build-input/channels.conf" | grep -o '.*:.*:.*:.*:.*:.*:.*:.*:.*:.*:.*:.*:0' | sort | uniq | while read channel ; do
         IFS=":"

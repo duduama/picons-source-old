@@ -4,9 +4,10 @@
 # Carl Worth <cworth@east.isi.edu>
 # based on a script by Steve Redler IV, steve@sr-tech.com 5-21-2001
 # 2003-04-25 rea@sr.unh.edu
-#   Updated to work on Familiar Pre0.7rc1, with busybox tar.
-#   Note it Requires: binutils-ar (since the busybox ar can't create)
-#   For UID debugging it needs a better "find".
+# Updated to work on Familiar Pre0.7rc1, with busybox tar.
+# Note it Requires: binutils-ar (since the busybox ar can't create)
+# For UID debugging it needs a better "find".
+
 set -e
 
 version=1.0
@@ -109,8 +110,8 @@ You probably want to chown these to a system user: " >&2
     [ "$?" -ne 0 ] && PKG_ERROR=1
     if [ -z "$source" ]; then
         echo "The Source field contain the URL's or filenames of the source code and any patches" 
-        echo "used to build this package.  Either gnu-style tarballs or Debian source packages "
-        echo "are acceptable.  Relative filenames may be used if they are distributed in the same"
+        echo "used to build this package. Either gnu-style tarballs or Debian source packages "
+        echo "are acceptable. Relative filenames may be used if they are distributed in the same"
         echo "directory as the .ipk file."
     fi
 
@@ -166,10 +167,10 @@ while getopts "cg:ho:v" opt; do
     g ) group=$OPTARG
         ogargs="$ogargs --group=$group"
         ;;
-        c ) outer=tar
-            ;;
-        C ) noclean=1
-            ;;
+    c ) outer=tar
+        ;;
+    C ) noclean=1
+        ;;
     v ) echo $version
         exit 0
         ;;
@@ -231,12 +232,14 @@ rm $tmp_dir/tarX
 
 echo "2.0" > $tmp_dir/debian-binary
 
+find "$tmp_dir" -exec touch --reference="$pkg_dir/CONTROL/control" {} \;
+
 pkg_file=$dest_dir/${pkg}_${version}_${arch}.ipk
 rm -f $pkg_file
 if [ "$outer" = "ar" ] ; then
-  ( cd $tmp_dir && ar -crf $pkg_file ./debian-binary ./data.tar.gz ./control.tar.gz )
+    ( cd $tmp_dir && ar -crf $pkg_file ./debian-binary ./data.tar.gz ./control.tar.gz )
 else
-  ( cd $tmp_dir && tar -zcf $pkg_file ./debian-binary ./data.tar.gz ./control.tar.gz )
+    ( cd $tmp_dir && tar $ogargs -zcf $pkg_file ./debian-binary ./data.tar.gz ./control.tar.gz )
 fi
 
 rm $tmp_dir/debian-binary $tmp_dir/data.tar.gz $tmp_dir/control.tar.gz
