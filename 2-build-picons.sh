@@ -85,6 +85,11 @@ for background in "$buildsource/backgrounds/"*.build ; do
                                 extent="220x132"
                                 compress="pngnq -g 2.2 -s 1"
                                 ;;
+                            "400x170")
+                                if [[ "$backgroundcolorname" == *-nopadding ]]; then resize="400x170"; else resize="369x157"; fi
+                                extent="400x170"
+                                compress="pngnq -g 2.2 -s 1"
+                                ;;
                             "400x240")
                                 if [[ "$backgroundcolorname" == *-nopadding ]]; then resize="400x240"; else resize="369x221"; fi
                                 extent="400x240"
