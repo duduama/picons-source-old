@@ -42,6 +42,7 @@ Thumbs.db
 
 # Project specific #
 ####################
-build-input/enigma2
-build-input/tvheadend
-build-input/channels.conf
+build-input/*
+!build-input/README.md
+build-output/*
+!build-output/README.md
